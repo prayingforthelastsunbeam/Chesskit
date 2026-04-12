@@ -2,13 +2,15 @@ import { CurrentPosition } from "@/types/eval";
 import { MoveClassification } from "@/types/enums";
 import { PrimitiveAtom, atom, useAtomValue } from "jotai";
 import Image from "next/image";
-import { CSSProperties, forwardRef, useMemo } from "react";
+import { CSSProperties, forwardRef, memo, useMemo } from "react";
 import {
   CustomSquareProps,
   Square,
 } from "react-chessboard/dist/chessboard/types";
 import { CLASSIFICATION_COLORS } from "@/constants";
 import { boardHueAtom } from "./states";
+import { areObjectsEqual, isObject } from "@/lib/object";
+import { useMediaQuery } from "@mui/material";
 
 export interface Props {
   currentPositionAtom: PrimitiveAtom<CurrentPosition>;
@@ -25,34 +27,82 @@ export function getSquareRenderer({
   showPlayerMoveIconAtom = atom(false),
   boardSize,
 }: Props) {
-  const squareRenderer = forwardRef<HTMLDivElement, CustomSquareProps>(
-    (props, ref) => {
+  const squareRenderer = memo(
+    forwardRef<HTMLDivElement, CustomSquareProps>((props, ref) => {
       const { children, square, style } = props;
-      const showPlayerMoveIcon = useAtomValue(showPlayerMoveIconAtom);
-      const position = useAtomValue(currentPositionAtom);
-      const clickedSquares = useAtomValue(clickedSquaresAtom);
-      const playableSquares = useAtomValue(playableSquaresAtom);
       const boardHue = useAtomValue(boardHueAtom);
 
-      const fromSquare = position.lastMove?.from;
-      const toSquare = position.lastMove?.to;
-      const moveClassification = position?.eval?.moveClassification;
+      const isClicked = useAtomValue(
+        useMemo(
+          () => atom((get) => get(clickedSquaresAtom).includes(square)),
+          [square]
+        )
+      );
+
+      const isPlayable = useAtomValue(
+        useMemo(
+          () => atom((get) => get(playableSquaresAtom).includes(square)),
+          [square]
+        )
+      );
+
+      const isFromSquare = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => get(currentPositionAtom).lastMove?.from === square),
+          [square]
+        )
+      );
+
+      const isToSquare = useAtomValue(
+        useMemo(
+          () => atom((get) => get(currentPositionAtom).lastMove?.to === square),
+          [square]
+        )
+      );
+
+      const showPlayerMoveIcon = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => {
+              const showIcon = get(showPlayerMoveIconAtom);
+              return isToSquare ? showIcon : false;
+            }),
+          [isToSquare]
+        )
+      );
+
+      const moveClassification = useAtomValue(
+        useMemo(
+          () =>
+            atom((get) => {
+              const evalData = get(currentPositionAtom).eval;
+
+              const isNeeded = isFromSquare || isToSquare;
+              if (!isNeeded) return undefined;
+
+              return evalData?.moveClassification;
+            }),
+          [isFromSquare, isToSquare]
+        )
+      );
 
       const highlightSquareStyle: CSSProperties | undefined = useMemo(
         () =>
-          clickedSquares.includes(square)
+          isClicked
             ? rightClickSquareStyle
-            : fromSquare === square || toSquare === square
+            : isFromSquare || isToSquare
               ? previousMoveSquareStyle(moveClassification)
               : undefined,
-        [clickedSquares, square, fromSquare, toSquare, moveClassification]
+        [isClicked, isFromSquare, isToSquare, moveClassification]
       );
 
-      const playableSquareStyle: CSSProperties | undefined = useMemo(
-        () =>
-          playableSquares.includes(square) ? playableSquareStyles : undefined,
-        [playableSquares, square]
+      const isLgOrGreater = useMediaQuery((theme) =>
+        theme.breakpoints.up("lg")
       );
+
+      const isBorderColumn = square[0] === "a" || square[0] === "h";
+      const iconOffset = isBorderColumn && !isLgOrGreater ? 7 : 0;
 
       return (
         <div
@@ -65,8 +115,8 @@ export function getSquareRenderer({
         >
           {children}
           {highlightSquareStyle && <div style={highlightSquareStyle} />}
-          {playableSquareStyle && <div style={playableSquareStyle} />}
-          {moveClassification && showPlayerMoveIcon && square === toSquare && (
+          {isPlayable && <div style={playableSquareStyles} />}
+          {moveClassification && showPlayerMoveIcon && isToSquare && (
             <Image
               src={`/icons/${moveClassification}.png`}
               alt="move-icon"
@@ -74,14 +124,26 @@ export function getSquareRenderer({
               height={Math.min(40, boardSize * 0.06)}
               style={{
                 position: "absolute",
-                top: Math.max(-13.5, boardSize * -0.03) + "px",
-                right: Math.max(-13.5, boardSize * -0.03) + "px",
+                top: Math.max(-13.5, boardSize * -0.03) + iconOffset + "px",
+                right: Math.max(-13.5, boardSize * -0.03) + iconOffset + "px",
                 zIndex: 100,
               }}
             />
           )}
         </div>
       );
+    }),
+    (prevProps, nextProps) => {
+      if (prevProps === nextProps) return true;
+      if (prevProps.square !== nextProps.square) return false;
+      if (prevProps.squareColor !== nextProps.squareColor) return false;
+      if (prevProps.key !== nextProps.key) return false;
+      if (prevProps.ref !== nextProps.ref) return false;
+      if (!areObjectsEqual(prevProps.style, nextProps.style)) return false;
+      if (!areChildrensEqual(prevProps.children, nextProps.children)) {
+        return false;
+      }
+      return true;
     }
   );
 
@@ -120,3 +182,39 @@ const previousMoveSquareStyle = (
     : "#fad541",
   opacity: 0.5,
 });
+
+const areChildrensEqual = (
+  prevChildren: React.ReactNode,
+  nextChildren: React.ReactNode
+): boolean => {
+  if (prevChildren === nextChildren) return true;
+  if (!Array.isArray(prevChildren) || !Array.isArray(nextChildren)) {
+    return false;
+  }
+  if (prevChildren.length !== nextChildren.length) return false;
+
+  for (let i = 0; i < prevChildren.length; i++) {
+    const prevChild: unknown = prevChildren[i];
+    const nextChild: unknown = nextChildren[i];
+
+    if (prevChild === nextChild) continue;
+
+    if (!isElementWithProps(prevChild) || !isElementWithProps(nextChild)) {
+      return false;
+    }
+
+    for (const key of ["row", "col", "piece", "square"]) {
+      if (prevChild.props[key] !== nextChild.props[key]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const isElementWithProps = (
+  node: unknown
+): node is React.ReactElement<Record<string, unknown>> => {
+  return isObject(node) && "props" in node && isObject(node.props);
+};
