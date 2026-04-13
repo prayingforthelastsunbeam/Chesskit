@@ -311,7 +311,7 @@ export class UciEngine {
           return;
         }
 
-        const result = await this.evaluatePosition(fen, depth, workersNb);
+        const result = await this.evaluatePosition(fen, depth);
         updateEval(i, result);
       })
     );
@@ -346,19 +346,8 @@ export class UciEngine {
 
   private async evaluatePosition(
     fen: string,
-    depth = 16,
-    workersNb: number
+    depth = 16
   ): Promise<PositionEval> {
-    if (workersNb < 2) {
-      const lichessEval = await getLichessEval(fen, this.multiPv);
-      if (
-        lichessEval.lines.length >= this.multiPv &&
-        lichessEval.lines[0].depth >= depth
-      ) {
-        return lichessEval;
-      }
-    }
-
     const results = await this.sendCommands(
       [`position fen ${fen}`, `go depth ${depth}`],
       "bestmove"

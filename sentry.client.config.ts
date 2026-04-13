@@ -42,6 +42,8 @@ if (
       "Aborted(NetworkError: Failed to execute 'send' on 'XMLHttpRequest'",
       "Aborted(CompileError: WebAssembly.Module doesn't parse at byte",
       "Aborted(NetworkError:  A network error occurred",
+      "TimeoutError: signal timed out",
+      "AbortError: The user aborted a request",
     ],
   });
 }

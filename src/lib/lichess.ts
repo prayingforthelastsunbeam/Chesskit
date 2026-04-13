@@ -85,12 +85,19 @@ const fetchLichessEval = async (
   try {
     const res = await fetch(
       `https://lichess.org/api/cloud-eval?fen=${fen}&multiPv=${multiPv}`,
-      { method: "GET", signal: AbortSignal.timeout(1_000) }
+      { method: "GET", signal: AbortSignal.timeout(500) }
     );
 
-    return res.json();
+    const json = await res.json();
+    return json;
   } catch (error) {
-    console.error(error);
+    const isTimeoutError =
+      error instanceof Error && error.name === "TimeoutError";
+    const isAbortError = error instanceof Error && error.name === "AbortError";
+
+    if (!isTimeoutError && !isAbortError) {
+      console.error(error);
+    }
 
     return { error: LichessError.NotFound };
   }
