@@ -20,19 +20,15 @@ export const ToolbarButton = ({
 
   return (
     <Tooltip title={tooltip}>
-      <span
-        style={{
-          height: "stretch",
-        }}
-      >
+      <span>
         <IconButton
           onClick={onClick}
           disabled={disabled}
           sx={{
             paddingX,
-            height: "stretch",
             borderRadius: "8px",
             width: "auto",
+            height: "46px",
           }}
         >
           <Icon icon={icon} height={iconHeight} />

@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 
 if (
   process.env.NEXT_PUBLIC_SENTRY_DSN &&
-  document.location.hostname !== "localhost"
+  document.location.hostname === "chesskit.org"
 ) {
   Sentry.init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
